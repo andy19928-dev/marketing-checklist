@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>行銷活動檢核系統 V2（Supabase 雲端版）</title>
+
+<!-- Supabase JavaScript 客戶端 -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+    :root {
+        --primary-color: #2c3e50;
+        --secondary-color: #34495e;
+        --accent-color: #3498db;
+        --bg-color: #f8f9fa;
+        --success-color: #2ecc71;
+    }
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: var(--bg-color);
+        margin: 0;
+        padding: 40px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    h1 { color: var(--primary-color); margin-bottom: 10px; }
+
+    /* 頂部登入列 */
+    .auth-bar {
+        width: 80%;
+        max-width: 1000px;
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 20px;
+        min-height: 40px;
+    }
+    .auth-bar .user-email { color: var(--secondary-color); font-weight: bold; }
+    .btn-google {
+        background-color: #fff;
+        color: #444;
+        border: 1px solid #ccc;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: bold;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .btn-google:hover { background-color: #f1f1f1; }
+    .btn-logout {
+        background-color: #95a5a6; color:#fff; border:none;
+        padding: 8px 16px; border-radius:4px; cursor:pointer; font-weight:bold;
+    }
+    .btn-logout:hover { background-color:#7f8c8d; }
+
+    .overview-container {
+        width: 80%;
+        max-width: 1000px;
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        margin-bottom: 30px;
+    }
+    .overview-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+    .overview-table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+    }
+    .overview-table th, .overview-table td {
+        padding: 12px 15px;
+        border-bottom: 1px solid #ddd;
+    }
+    .overview-table th {
+        background-color: #f2f2f2;
+        color: var(--primary-color);
+    }
+    .overview-table tr:hover { background-color: #f9f9f9; }
+
+    .badge { font-size: 11px; padding: 3px 8px; border-radius: 10px; font-weight: bold; }
+    .badge-public { background: #e8f8f0; color: #1e8e57; }
+    .badge-private { background: #fdecea; color: #c0392b; }
+
+    .btn {
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        font-size: 14px;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+        font-weight: bold;
+    }
+    .btn-primary { background-color: var(--primary-color); }
+    .btn-primary:hover { background-color: var(--secondary-color); }
+    .btn-action { background-color: var(--accent-color); padding: 6px 12px; font-size: 12px;}
+    .btn-action:hover { background-color: #2980b9; }
+    .btn-save { background-color: var(--success-color); width: 100%; margin-top: 15px;}
+    .btn-save:hover { background-color: #27ae60; }
+
+    .overlay {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.6);
+        z-index: 10;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .modal-content {
+        background: white;
+        padding: 30px;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        position: relative;
+        max-width: 90vw;
+    }
+    .form-modal { width: 450px; }
+    .mindmap-container { width: 850px; }
+    .checklist-modal { width: 550px; z-index: 20; }
+
+    .close-btn {
+        position: absolute;
+        top: 15px; right: 20px;
+        font-size: 24px;
+        cursor: pointer;
+        color: #7f8c8d;
+    }
+    .close-btn:hover { color: #e74c3c; }
+
+    .form-group {
+        margin-bottom: 15px;
+        display: flex;
+        flex-direction: column;
+    }
+    .form-group label { margin-bottom: 5px; font-weight: bold; color: var(--secondary-color); }
+    .form-group input, .form-group select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+
+    .grid-map {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        grid-template-rows: repeat(4, auto);
+        gap: 20px;
+        align-items: center;
+        justify-items: center;
+        margin-top: 20px;
+    }
+    .node {
+        background: white;
+        border: 2px solid var(--primary-color);
+        padding: 15px 20px;
+        border-radius: 8px;
+        font-weight: bold;
+        color: var(--primary-color);
+        cursor: pointer;
+        transition: all 0.2s;
+        width: 130px;
+        text-align: center;
+        position: relative;
+    }
+    .node:hover {
+        background: var(--primary-color);
+        color: white;
+        transform: translateY(-2px);
+    }
+
+    .arrow-right::after { content: '→'; position: absolute; right: -30px; top: 50%; transform: translateY(-50%); color: var(--primary-color); font-size: 20px; }
+    .arrow-up::after { content: '↑'; position: absolute; top: -35px; left: 50%; transform: translateX(-50%); color: var(--primary-color); font-size: 20px; }
+
+    #node-ad { grid-column: 1; grid-row: 1; }
+    #node-web { grid-column: 2; grid-row: 1; }
+    #node-app { grid-column: 3; grid-row: 1; }
+    #node-apply { grid-column: 4; grid-row: 1; }
+    #node-terms { grid-column: 2; grid-row: 2; }
+    #node-copy { grid-column: 2; grid-row: 3; }
+    #node-sign { grid-column: 2; grid-row: 4; }
+
+    .checklist-items { list-style: none; padding: 0; margin: 20px 0; }
+    .checklist-items li {
+        margin-bottom: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 14px;
+        background: #fdfdfd;
+        padding: 8px;
+        border: 1px solid #edf2f7;
+        border-radius: 6px;
+    }
+    .item-left { display: flex; align-items: center; flex: 1; padding-right: 10px; }
+    .checklist-items input[type="checkbox"] { margin-right: 10px; width: 18px; height: 18px; cursor: pointer; }
+    .reminder-input { font-size: 12px; padding: 4px; border: 1px solid #cbd5e0; border-radius: 4px; color: #4a5568;}
+
+    .hint-banner {
+        width: 80%; max-width: 1000px;
+        background: #fff8e1; border: 1px solid #f1c40f; color: #7d6608;
+        padding: 12px 18px; border-radius: 6px; margin-bottom: 20px; font-size: 14px;
+    }
+</style>
+</head>
+<body>
+
+    <h1>行銷活動檢核系統</h1>
+
+    <!-- 登入狀態列 -->
+    <div class="auth-bar" id="authBar"></div>
+
+    <!-- 未登入提示（登入後自動隱藏） -->
+    <div class="hint-banner" id="loginHint" style="display:none;">
+        目前以訪客身分瀏覽，只會看到「公開」活動。請用 Google 登入後即可新增活動、管理自己的私人活動。
+    </div>
+
+    <div class="overview-container">
+        <div class="overview-header">
+            <h2>活動總覽 Overview</h2>
+            <button class="btn btn-primary" onclick="handleAddClick()">＋ 新增行銷活動</button>
+        </div>
+        <table class="overview-table">
+            <thead>
+                <tr>
+                    <th>活動名稱</th>
+                    <th>負責人</th>
+                    <th>上線時間</th>
+                    <th>可見範圍</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody id="overviewTbody"></tbody>
+        </table>
+    </div>
+
+    <!-- 新增活動表單 -->
+    <div class="overlay" id="formOverlay">
+        <div class="modal-content form-modal">
+            <span class="close-btn" onclick="closeModal('formOverlay')">×</span>
+            <h3>新增行銷活動</h3>
+            <div class="form-group">
+                <label>活動名稱</label>
+                <input type="text" id="formActiveName" placeholder="例如：2026好運貸年度開運信貸">
+            </div>
+            <div class="form-group">
+                <label>負責人</label>
+                <input type="text" id="formOwner" placeholder="例如：王小明">
+            </div>
+            <div class="form-group">
+                <label>負責人 Email</label>
+                <input type="email" id="formEmail" placeholder="例如：xiaoming@bank.com">
+            </div>
+            <div class="form-group">
+                <label>活動上線時間</label>
+                <input type="datetime-local" id="formLaunchTime">
+            </div>
+            <div class="form-group">
+                <label>簽呈字號</label>
+                <input type="text" id="formSignNo" placeholder="例如：消金字第11500123號">
+            </div>
+            <div class="form-group">
+                <label>活動可見範圍</label>
+                <select id="formVisibility">
+                    <option value="false">🔒 私人（只有我自己看得到）</option>
+                    <option value="true">🌐 公開（所有人都看得到）</option>
+                </select>
+            </div>
+            <button class="btn btn-save" onclick="createActivity()">確認建立活動</button>
+        </div>
+    </div>
+
+    <!-- 心智圖 -->
+    <div class="overlay" id="mindmapOverlay">
+        <div class="modal-content mindmap-container">
+            <span class="close-btn" onclick="closeModal('mindmapOverlay')">×</span>
+            <h2 id="mindmapActivityTitle">活動流程心智圖</h2>
+            <p id="mindmapActivityMeta" style="color:#7f8c8d; margin-top:-10px;"></p>
+            <div class="grid-map">
+                <div class="node arrow-right" id="node-ad" onclick="openChecklist('廣告')">廣告</div>
+                <div class="node arrow-right" id="node-web" onclick="openChecklist('網站')">網站</div>
+                <div class="node arrow-right" id="node-app" onclick="openChecklist('APP')">APP</div>
+                <div class="node" id="node-apply" onclick="openChecklist('申辦')">申辦</div>
+
+                <div class="node arrow-up" id="node-terms" onclick="openChecklist('官網注意事項')">官網注意事項</div>
+                <div class="node arrow-up" id="node-copy" onclick="openChecklist('簡文')">簡文</div>
+                <div class="node arrow-up" id="node-sign" onclick="openChecklist('簽呈')">簽呈</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Checklist -->
+    <div class="overlay" id="checklistOverlay" style="background: rgba(0,0,0,0.3); z-index: 15;">
+        <div class="modal-content checklist-modal">
+            <span class="close-btn" onclick="closeChecklist()">×</span>
+            <h3 id="checklistTitle">節點名稱</h3>
+            <ul class="checklist-items" id="checklistContent"></ul>
+            <button class="btn btn-save" id="checklistSaveBtn" onclick="saveChecklistProgress()">儲存檢核進度與提醒</button>
+        </div>
+    </div>
+
+<script>
+    // ===================================================================
+    // ⚙️ 設定區：把下面兩個值換成你自己的 Supabase 專案資訊
+    //    位置：Supabase 後台 → Project Settings → Data API（或 API）
+    //    - SUPABASE_URL：https://luvltjuhupfzgabewlrp.supabase.co/rest/v1/
+    //    - SUPABASE_ANON_KEY：eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx1dmx0anVodXBmemdhYmV3bHJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyNDQ2ODYsImV4cCI6MjA5NzgyMDY4Nn0.cVIOx2S4RQ6Uz2hz60LcBsN_gxu4LMsvgN6h4c-6sUM
+    // ===================================================================
+    const SUPABASE_URL = 'sb_publishable_GtoH8fKROx9czp4zSBtPiQ_RBKnGIsD';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx1dmx0anVodXBmemdhYmV3bHJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyNDQ2ODYsImV4cCI6MjA5NzgyMDY4Nn0.cVIOx2S4RQ6Uz2hz60LcBsN_gxu4LMsvgN6h4c-6sUM';
+
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // 固定的檢核項目範本
+    const checkListTemplate = {
+        '廣告': ['【法遵審閱】素材文案內容', '【製作】素材文案', '【進稿】素材文案'],
+        '網站': ['【法遵審閱】對應活動之素材文案內容', '【廠商製作】對應活動之素材文案內容', '【後台上架】對應活動之素材文案內容', '確認是否要埋設追蹤碼'],
+        'APP': ['【法遵審閱】大聲公/貸款總覽/信貸牌卡/情境牌卡文案內容', '【法遵審閱】推播文案內容', '【法遵審閱】BTS版位文案內容'],
+        '申辦': ['【消金確認】活動注意事項', '【客服公告】活動注意事項', '【TM公告】活動注意事項'],
+        '官網注意事項': ['【法遵審閱】活動辦法內容', '【上架】活動辦法內容'],
+        '簡文': ['【法遵審閱】簡文內容', '【簽核】公平待客覆核表', '上簡文系統'],
+        '簽呈': ['確認是否有簽呈字號支應活動費用']
+    };
+
+    let activities = [];        // 從雲端載入的活動清單
+    let currentUser = null;     // 目前登入的使用者
+    let currentActivityId = null;
+    let currentNodesName = null;
+
+    // ---------- 初始化 ----------
+    window.onload = async function() {
+        // 取得目前登入狀態
+        const { data: { session } } = await sb.auth.getSession();
+        currentUser = session ? session.user : null;
+
+        // 監聽登入/登出變化（例如 Google 跳轉回來後）
+        sb.auth.onAuthStateChange((_event, session) => {
+            currentUser = session ? session.user : null;
+            renderAuthUI();
+            loadActivities();
+        });
+
+        renderAuthUI();
+        await loadActivities();
+    };
+
+    // ---------- 登入 / 登出 ----------
+    async function signInWithGoogle() {
+        const { error } = await sb.auth.signInWithOAuth({
+            provider: 'google',
+            options: { redirectTo: window.location.origin }
+        });
+        if (error) alert('登入失敗：' + error.message);
+    }
+
+    async function signOut() {
+        await sb.auth.signOut();
+    }
+
+    function renderAuthUI() {
+        const bar = document.getElementById('authBar');
+        const hint = document.getElementById('loginHint');
+        if (currentUser) {
+            bar.innerHTML = `
+                <span class="user-email">👤 ${currentUser.email}</span>
+                <button class="btn-logout" onclick="signOut()">登出</button>`;
+            hint.style.display = 'none';
+        } else {
+            bar.innerHTML = `
+                <button class="btn-google" onclick="signInWithGoogle()">
+                    <svg width="16" height="16" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.6 2.4 30.1 0 24 0 14.6 0 6.4 5.4 2.6 13.2l7.9 6.2C12.3 13.2 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.1 5.3-4.6 6.9l7.1 5.5C43.3 37.4 46.1 31.5 46.1 24.5z"/><path fill="#FBBC05" d="M10.5 28.4c-.5-1.4-.7-2.9-.7-4.4s.3-3 .7-4.4l-7.9-6.2C1 16.9 0 20.3 0 24s1 7.1 2.6 10.6l7.9-6.2z"/><path fill="#34A853" d="M24 48c6.1 0 11.3-2 15.1-5.5l-7.1-5.5c-2 1.3-4.5 2.1-8 2.1-6.3 0-11.7-3.7-13.5-9l-7.9 6.2C6.4 42.6 14.6 48 24 48z"/></svg>
+                    使用 Google 登入
+                </button>`;
+            hint.style.display = 'block';
+        }
+    }
+
+    function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+    function handleAddClick() {
+        if (!currentUser) { alert('請先用 Google 登入後再新增活動。'); return; }
+        openModal('formOverlay');
+    }
+
+    // ---------- 載入活動（從雲端） ----------
+    async function loadActivities() {
+        const { data, error } = await sb
+            .from('activities')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error(error);
+            alert('讀取活動失敗，請確認 Supabase 設定是否正確。\n' + error.message);
+            return;
+        }
+        activities = data || [];
+        renderOverview();
+    }
+
+    // ---------- 渲染總覽 ----------
+    function renderOverview() {
+        const tbody = document.getElementById('overviewTbody');
+        tbody.innerHTML = '';
+
+        if (activities.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#999;">目前沒有可顯示的活動。</td></tr>`;
+            return;
+        }
+
+        activities.forEach(act => {
+            const isOwner = currentUser && act.owner_id === currentUser.id;
+            const badge = act.is_public
+                ? '<span class="badge badge-public">🌐 公開</span>'
+                : '<span class="badge badge-private">🔒 私人</span>';
+
+            // 只有自己的活動才顯示刪除鈕
+            const deleteBtn = isOwner
+                ? `<button class="btn btn-action" style="background:#e74c3c" onclick="deleteActivity('${act.id}')">刪除</button>`
+                : '';
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><strong>${act.name}</strong></td>
+                <td>${act.owner || ''}</td>
+                <td>${act.launch_time ? act.launch_time.replace('T', ' ').slice(0,16) : '未設定'}</td>
+                <td>${badge}</td>
+                <td>
+                    <button class="btn btn-action" onclick="viewMindmap('${act.id}')">進入心智圖檢核</button>
+                    ${deleteBtn}
+                </td>`;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // ---------- 建立新活動 ----------
+    async function createActivity() {
+        if (!currentUser) { alert('請先登入。'); return; }
+
+        const name = document.getElementById('formActiveName').value.trim();
+        const owner = document.getElementById('formOwner').value.trim();
+        const email = document.getElementById('formEmail').value.trim();
+        const launchTime = document.getElementById('formLaunchTime').value;
+        const signNo = document.getElementById('formSignNo').value.trim();
+        const isPublic = document.getElementById('formVisibility').value === 'true';
+
+        if (!name || !owner || !email) {
+            alert('請至少填寫活動名稱、負責人與 Email！');
+            return;
+        }
+
+        // 初始化此活動專屬的 checklist 結構
+        const nodeStatus = {};
+        for (let node in checkListTemplate) {
+            nodeStatus[node] = checkListTemplate[node].map(item => ({
+                text: item, checked: false, reminderTime: ""
+            }));
+        }
+
+        const { error } = await sb.from('activities').insert({
+            owner_id: currentUser.id,
+            name, owner, email,
+            launch_time: launchTime || null,
+            sign_no: signNo,
+            is_public: isPublic,
+            progress: nodeStatus
+        });
+
+        if (error) { alert('建立失敗：' + error.message); return; }
+
+        closeModal('formOverlay');
+        ['formActiveName','formOwner','formEmail','formLaunchTime','formSignNo'].forEach(id => document.getElementById(id).value = '');
+        document.getElementById('formVisibility').value = 'false';
+        await loadActivities();
+    }
+
+    // ---------- 進入心智圖 ----------
+    function viewMindmap(id) {
+        currentActivityId = id;
+        const act = activities.find(a => a.id === id);
+        document.getElementById('mindmapActivityTitle').innerText = `【${act.name}】流程檢核`;
+        document.getElementById('mindmapActivityMeta').innerText =
+            `負責人：${act.owner || '-'} (${act.email || '-'}) ｜ 簽呈字號：${act.sign_no || '無'}`;
+        openModal('mindmapOverlay');
+    }
+
+    // ---------- 打開 Checklist ----------
+    function openChecklist(nodeName) {
+        currentNodesName = nodeName;
+        const act = activities.find(a => a.id === currentActivityId);
+        const isOwner = currentUser && act.owner_id === currentUser.id;
+
+        document.getElementById('checklistOverlay').style.display = 'flex';
+        document.getElementById('checklistTitle').innerText = nodeName + ' 項目檢核';
+
+        const ul = document.getElementById('checklistContent');
+        ul.innerHTML = '';
+        const items = (act.progress && act.progress[nodeName]) || [];
+
+        items.forEach((item, index) => {
+            const li = document.createElement('li');
+            li.innerHTML = `
+                <div class="item-left">
+                    <input type="checkbox" id="chk-${index}" ${item.checked ? 'checked' : ''} ${isOwner ? '' : 'disabled'}>
+                    <span>${item.text}</span>
+                </div>
+                <div>
+                    <span style="font-size:11px; color:#718096; margin-right:5px;">⏰ 提醒時間:</span>
+                    <input type="datetime-local" class="reminder-input" id="time-${index}" value="${item.reminderTime || ''}" ${isOwner ? '' : 'disabled'}>
+                </div>`;
+            ul.appendChild(li);
+        });
+
+        // 不是擁有者就唯讀，隱藏儲存鈕
+        document.getElementById('checklistSaveBtn').style.display = isOwner ? 'block' : 'none';
+    }
+
+    // ---------- 儲存進度 ----------
+    async function saveChecklistProgress() {
+        const act = activities.find(a => a.id === currentActivityId);
+        const items = act.progress[currentNodesName];
+
+        items.forEach((item, index) => {
+            item.checked = document.getElementById(`chk-${index}`).checked;
+            item.reminderTime = document.getElementById(`time-${index}`).value;
+        });
+
+        const { error } = await sb.from('activities')
+            .update({ progress: act.progress })
+            .eq('id', act.id);
+
+        if (error) { alert('儲存失敗：' + error.message); return; }
+        closeChecklist();
+    }
+
+    function closeChecklist() {
+        document.getElementById('checklistOverlay').style.display = 'none';
+    }
+
+    // ---------- 刪除活動 ----------
+    async function deleteActivity(id) {
+        if (!confirm('確定要刪除這個活動及其所有檢核紀錄嗎？')) return;
+        const { error } = await sb.from('activities').delete().eq('id', id);
+        if (error) { alert('刪除失敗：' + error.message); return; }
+        await loadActivities();
+    }
+
+    // 註：原本「背景計時器 + 假裝寄信」的功能已移除。
+    //     真正會自動寄出的提醒信，會在「階段三」用 Supabase Edge Function + Resend 處理，
+    //     讓它跑在伺服器上，使用者關掉瀏覽器也能寄信。
+    //     使用者在這裡設定的「提醒時間」會存進資料庫，階段三的程式會去讀取。
+</script>
+
+</body>
+</html>
